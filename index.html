@@ -34,11 +34,27 @@ body {
     max-width: 500px;
 }
 
-h1 {
+.header {
     text-align: center;
     margin-bottom: 25px;
-    font-size: 22px;
+}
+
+.week-title {
+    font-size: 20px;
     font-weight: 600;
+}
+
+.week-dates {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 5px;
+}
+
+.search-title {
+    text-align: center;
+    margin: 20px 0 15px;
+    font-size: 18px;
+    font-weight: 500;
 }
 
 .search-box {
@@ -104,18 +120,18 @@ button:hover {
     margin-top: 15px;
     color: #ef4444;
 }
-
-@media (max-width: 480px) {
-    h1 {
-        font-size: 20px;
-    }
-}
 </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Consulter mon planning</h1>
+
+    <div class="header">
+        <div id="weekTitle" class="week-title">Chargement...</div>
+        <div id="weekDates" class="week-dates"></div>
+    </div>
+
+    <div class="search-title">Consulter mon planning</div>
 
     <div class="search-box">
         <input type="text" id="ccmsInput" placeholder="Entrer votre BMS / CCMS">
@@ -124,20 +140,56 @@ button:hover {
 
     <div id="result" class="card"></div>
     <div id="error" class="error"></div>
+
 </div>
 
 <script>
-let planningData = [];
 
-// Charger le JSON
+let planningData = [];
+let semaine = null;
+let annee = null;
+
+// Calculer les dates lundi → dimanche à partir semaine ISO
+function getWeekDates(year, week) {
+    const simple = new Date(year, 0, 1 + (week - 1) * 7);
+    const dow = simple.getDay();
+    const ISOweekStart = simple;
+
+    if (dow <= 4)
+        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+    else
+        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+
+    const monday = new Date(ISOweekStart);
+    const sunday = new Date(ISOweekStart);
+    sunday.setDate(monday.getDate() + 6);
+
+    return { monday, sunday };
+}
+
+// Charger JSON
 fetch("planning_complet.json")
     .then(res => res.json())
     .then(data => {
-        planningData = data;
+
+        semaine = data.semaine;
+        annee = data.annee;
+        planningData = data.agents;
+
+        document.getElementById("weekTitle").textContent =
+            `Planning S${semaine} – ${annee}`;
+
+        const { monday, sunday } = getWeekDates(annee, semaine);
+
+        const options = { day: 'numeric', month: 'long' };
+
+        document.getElementById("weekDates").textContent =
+            `Du ${monday.toLocaleDateString('fr-FR', options)} ` +
+            `au ${sunday.toLocaleDateString('fr-FR', options)}`;
     })
     .catch(err => {
-        document.getElementById("error").textContent =
-            "Impossible de charger le planning.";
+        document.getElementById("weekTitle").textContent =
+            "Impossible de charger le planning";
         console.error(err);
     });
 
@@ -161,16 +213,14 @@ function chercherPlanning() {
         return;
     }
 
-    let html = `
-        <div class="agent-name">${agent.nom}</div>
-    `;
+    let html = `<div class="agent-name">${agent.nom}</div>`;
 
     for (const [jour, heures] of Object.entries(agent.planning)) {
         html += `
             <div class="day">
                 <div class="day-name">${jour}</div>
                 <div>
-                    ${heures.debut ? heures.debut : "--:--"} - 
+                    ${heures.debut ? heures.debut : "--:--"} -
                     ${heures.fin ? heures.fin : "--:--"}
                 </div>
             </div>
